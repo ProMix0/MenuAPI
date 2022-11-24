@@ -1,0 +1,107 @@
+openapi: 3.1.0
+info:
+  title: MenuAPI
+  version: 1.0.0
+servers:
+  - description: local
+    url: http://localhost:8082/
+paths:
+  /list:
+    get:
+      summary: Returns list of menu id's
+      responses: 
+        2XX: 
+          description: Array of id's
+          content: 
+            application/json:
+              schema:
+                type: array
+                items: 
+                  $ref: '#/components/schemas/id'
+  /item/{id}:
+    get:
+      summary: Returns info about selected item
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses: 
+        2XX:
+          description: Info about item
+          content: 
+            application/json:
+              schema:
+                $ref: '#/components/schemas/itemInfo'
+        4XX:
+          description: Invalid id
+  /item/{id}/image:
+    get:
+      summary: Returns image of selected item
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses: 
+        2XX:
+          description: Image of item
+          content: 
+            image/jpeg:
+        4XX:
+          description: Invalid id
+  /purchase:
+    post:
+      summary: Buy selected items
+      requestBody: 
+        content: 
+          application/json:
+            schema:
+              $ref: '#/components/schemas/purchaseInfo'
+      responses: 
+        2XX: 
+          description: QR-code to pay
+          content: 
+            image/jpeg:
+        4XX:
+          description: Invalid id or count
+          content: 
+            application/json:
+              schema:
+                $ref: '#/components/schemas/invalidPurchase'
+
+components:
+  schemas:
+    id:
+      type: integer
+    itemInfo:
+      allOf:
+      - $ref: '#/components/schemas/id'
+      - type: object
+        properties:
+          name:
+            type: string
+          available:
+            type: integer
+    purchaseInfo:
+      type: array
+      items:
+        $ref: '#/components/schemas/purchaseItem'
+    purchaseItem:
+      allOf: 
+        - $ref: '#/components/schemas/id'
+        - type: object
+          properties:
+            count:
+              type: integer
+    invalidPurchase:
+      type: object
+      properties:
+        invalidIds:
+          type: array
+          items: 
+            $ref: '#/components/schemas/id'
+        invalidCounts:
+          type: array
+          items: 
+            $ref: '#/components/schemas/purchaseItem'
+      
+  parameters:
+    id:
+      name: id
+      required: true
+      in: path
