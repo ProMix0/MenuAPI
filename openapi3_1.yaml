@@ -77,6 +77,8 @@ components:
             type: string
           available:
             type: integer
+          price:
+            type: integer
     purchaseInfo:
       type: array
       items:

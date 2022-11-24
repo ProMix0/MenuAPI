@@ -50,21 +50,22 @@ func (model Model) EnumerateIds(writer http.ResponseWriter, request *http.Reques
 
 func (model Model) GetItem(writer http.ResponseWriter, request *http.Request) {
 	id, _ := strconv.Atoi(mux.Vars(request)["id"])
-	row := model.db.QueryRow("SELECT Name, (Count - Locked) AS Free FROM Menu WHERE Id = $1", id)
+	row := model.db.QueryRow("SELECT Name, (Count - Locked) AS Free, Price FROM Menu WHERE Id = $1", id)
 	if row.Err() != nil {
 		panic(row.Err())
 	}
-	var free int
+	var free, price int
 	var name string
-	err := row.Scan(&name, &free)
+	err := row.Scan(&name, &free, &price)
 	if err != nil {
 		writer.WriteHeader(404)
 		return
 	}
-	response := make(map[string]interface{}, 3)
+	response := make(map[string]interface{}, 4)
 	response["id"] = id
 	response["name"] = name
 	response["available"] = free
+	response["price"] = price
 	writer.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(writer).Encode(response)
 	if err != nil {
