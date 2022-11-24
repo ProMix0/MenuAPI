@@ -92,12 +92,12 @@ func (model Model) GetItemImage(writer http.ResponseWriter, request *http.Reques
 }
 
 type purchaseItem struct {
-	id    int
-	count int
+	Id    int `json:"id"`
+	Count int `json:"count"`
 }
 
 func (model Model) Purchase(writer http.ResponseWriter, request *http.Request) {
-	requestBody := make([]purchaseItem, 8)
+	var requestBody []purchaseItem
 	err := json.NewDecoder(request.Body).Decode(&requestBody)
 	if err != nil {
 		writer.WriteHeader(http.StatusBadRequest)
@@ -115,7 +115,7 @@ func (model Model) Purchase(writer http.ResponseWriter, request *http.Request) {
 	}
 
 	for _, item := range requestBody {
-		_, err = model.db.Exec("UPDATE Menu SET Locked = Locked + $1 WHERE Id = $2", item.count, item.id)
+		_, err = model.db.Exec("UPDATE Menu SET Locked = Locked + $1 WHERE Id = $2", item.Count, item.Id)
 		if err != nil {
 			panic(err)
 		}
@@ -132,7 +132,7 @@ func (model Model) Purchase(writer http.ResponseWriter, request *http.Request) {
 
 	//TODO get paying confirmation
 	for _, item := range requestBody {
-		_, err = model.db.Exec("UPDATE Menu SET Locked = Locked - $1, Count = Count - $1 WHERE Id = $2", item.count, item.id)
+		_, err = model.db.Exec("UPDATE Menu SET Locked = Locked - $1, Count = Count - $1 WHERE Id = $2", item.Count, item.Id)
 		if err != nil {
 			panic(err)
 		}
@@ -140,27 +140,28 @@ func (model Model) Purchase(writer http.ResponseWriter, request *http.Request) {
 }
 
 type purchaseState struct {
-	invalidIds    []int
-	invalidCounts []purchaseItem
+	InvalidIds    []int          `json:"invalidIds"`
+	InvalidCounts []purchaseItem `json:"invalidCounts"`
 }
 
 func (state purchaseState) valid() bool {
-	return len(state.invalidCounts) == 0 && len(state.invalidIds) == 0
+	return len(state.InvalidCounts) == 0 && len(state.InvalidIds) == 0
 }
 
 func validate(model Model, request []purchaseItem) (result purchaseState) {
 	for _, item := range request {
-		row := model.db.QueryRow("SELECT (Count - Locked) AS Free FROM Menu WHERE Id = $1", item.id)
+		row := model.db.QueryRow("SELECT (Count - Locked) AS Free FROM Menu WHERE Id = $1", item.Id)
 		if row.Err() != nil {
-			result.invalidIds = append(result.invalidIds, item.id)
+			panic(row.Err())
 		}
 		var count int
 		err := row.Scan(&count)
 		if err != nil {
-			panic(err)
+			result.InvalidIds = append(result.InvalidIds, item.Id)
+			continue
 		}
-		if item.count <= 0 || item.count > count {
-			result.invalidCounts = append(result.invalidCounts, item)
+		if item.Count <= 0 || item.Count > count {
+			result.InvalidCounts = append(result.InvalidCounts, item)
 		}
 	}
 	return
