@@ -75,7 +75,22 @@ func (model Model) GetItem(writer http.ResponseWriter, request *http.Request) {
 }
 
 func (model Model) GetItemImage(writer http.ResponseWriter, request *http.Request) {
-	//TODO read blob from db
+	id, _ := strconv.Atoi(mux.Vars(request)["id"])
+	row := model.db.QueryRow("SELECT Image FROM Menu WHERE Id = $1", id)
+	if row.Err() != nil {
+		writer.WriteHeader(404)
+		return
+	}
+	image := make([]byte, 256*1024)
+	err := row.Scan(&image)
+	if err != nil {
+		panic(err)
+	}
+	writer.Header().Set("Content-Type", "image/jpeg")
+	_, err = writer.Write(image)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func (model Model) Purchase(writer http.ResponseWriter, request *http.Request) {
