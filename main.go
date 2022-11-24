@@ -11,6 +11,7 @@ import (
 func main() {
 	router := mux.NewRouter()
 	model := modelPkg.NewModel("menu.db")
+	defer model.Close()
 
 	router.Use(panicRecovery)
 

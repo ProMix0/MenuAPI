@@ -13,6 +13,16 @@ import (
 
 type Model struct {
 	db *sql.DB
+
+	ids     []int
+	jsonIds []byte
+
+	items map[int]item
+}
+
+type item struct {
+	price int
+	name  string
 }
 
 func NewModel(dbPath string) Model {
@@ -20,7 +30,9 @@ func NewModel(dbPath string) Model {
 	if err != nil {
 		panic(err)
 	}
-	return Model{db}
+	model := Model{db: db}
+	model.UpdateCache()
+	return model
 }
 
 func (model Model) Close() {
@@ -28,44 +40,28 @@ func (model Model) Close() {
 }
 
 func (model Model) EnumerateIds(writer http.ResponseWriter, request *http.Request) {
-	var ids []int
-	rows, err := model.db.Query("SELECT Id FROM Menu")
-	if err != nil {
-		panic(err)
-	}
-	for rows.Next() {
-		var item int
-		err = rows.Scan(&item)
-		if err != nil {
-			panic(err)
-		}
-		ids = append(ids, item)
-	}
 	writer.Header().Set("Content-Type", "application/json")
-	err = json.NewEncoder(writer).Encode(ids)
-	if err != nil {
-		panic(err)
-	}
+	writer.Write(model.jsonIds)
 }
 
 func (model Model) GetItem(writer http.ResponseWriter, request *http.Request) {
 	id, _ := strconv.Atoi(mux.Vars(request)["id"])
-	row := model.db.QueryRow("SELECT Name, (Count - Locked) AS Free, Price FROM Menu WHERE Id = $1", id)
-	if row.Err() != nil {
-		panic(row.Err())
-	}
-	var free, price int
-	var name string
-	err := row.Scan(&name, &free, &price)
-	if err != nil {
+	item, ok := model.items[id]
+	if !ok {
 		writer.WriteHeader(404)
 		return
 	}
+	row := model.db.QueryRow("SELECT (Count - Locked) AS Free FROM Menu WHERE Id = $1", id)
+	var free int
+	err := row.Scan(&free)
+	if err != nil {
+		panic(err)
+	}
 	response := make(map[string]interface{}, 4)
 	response["id"] = id
-	response["name"] = name
+	response["name"] = item.name
 	response["available"] = free
-	response["price"] = price
+	response["price"] = item.price
 	writer.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(writer).Encode(response)
 	if err != nil {
@@ -75,15 +71,16 @@ func (model Model) GetItem(writer http.ResponseWriter, request *http.Request) {
 
 func (model Model) GetItemImage(writer http.ResponseWriter, request *http.Request) {
 	id, _ := strconv.Atoi(mux.Vars(request)["id"])
-	row := model.db.QueryRow("SELECT Image FROM Menu WHERE Id = $1", id)
-	if row.Err() != nil {
-		panic(row.Err())
+	_, ok := model.items[id]
+	if !ok {
+		writer.WriteHeader(404)
+		return
 	}
+	row := model.db.QueryRow("SELECT Image FROM Menu WHERE Id = $1", id)
 	image := make([]byte, 256*1024)
 	err := row.Scan(&image)
 	if err != nil {
-		writer.WriteHeader(404)
-		return
+		panic(err)
 	}
 	writer.Header().Set("Content-Type", "image/jpeg")
 	_, err = writer.Write(image)
@@ -122,6 +119,8 @@ func (model Model) Purchase(writer http.ResponseWriter, request *http.Request) {
 		}
 	}
 
+	_ /*price*/ = model.getPrice(requestBody)
+
 	//TODO get QR-code
 	writer.Header().Set("Content-Type", "image/jpeg")
 	file, _ := os.Open("QR-code.jpg")
@@ -138,6 +137,56 @@ func (model Model) Purchase(writer http.ResponseWriter, request *http.Request) {
 			panic(err)
 		}
 	}
+}
+
+func (model Model) getPrice(items []purchaseItem) int {
+	sum := 0
+	for _, item := range items {
+		itemInfo, _ := model.items[item.Id]
+		sum += itemInfo.price
+	}
+	return sum
+}
+
+func (model *Model) UpdateCache() {
+	model.updateIds()
+	model.updateItems()
+}
+
+func (model *Model) updateIds() {
+	var ids []int
+	rows, err := model.db.Query("SELECT Id FROM Menu")
+	if err != nil {
+		panic(err)
+	}
+	for rows.Next() {
+		var item int
+		err = rows.Scan(&item)
+		if err != nil {
+			panic(err)
+		}
+		ids = append(ids, item)
+	}
+	model.ids = ids
+	model.jsonIds, _ = json.Marshal(ids)
+}
+
+func (model *Model) updateItems() {
+	items := make(map[int]item)
+	rows, err := model.db.Query("SELECT Id, Name, Price FROM Menu")
+	if err != nil {
+		panic(err)
+	}
+	for rows.Next() {
+		var item item
+		var id int
+		err = rows.Scan(&id, &item.name, &item.price)
+		if err != nil {
+			panic(err)
+		}
+		items[id] = item
+	}
+	model.items = items
 }
 
 type purchaseState struct {
