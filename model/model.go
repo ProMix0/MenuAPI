@@ -52,14 +52,14 @@ func (model Model) GetItem(writer http.ResponseWriter, request *http.Request) {
 	id, _ := strconv.Atoi(mux.Vars(request)["id"])
 	row := model.db.QueryRow("SELECT Name, (Count - Locked) AS Free FROM Menu WHERE Id = $1", id)
 	if row.Err() != nil {
-		writer.WriteHeader(404)
-		return
+		panic(row.Err())
 	}
 	var free int
 	var name string
 	err := row.Scan(&name, &free)
 	if err != nil {
-		panic(err)
+		writer.WriteHeader(404)
+		return
 	}
 	response := make(map[string]interface{}, 3)
 	response["id"] = id
@@ -76,13 +76,13 @@ func (model Model) GetItemImage(writer http.ResponseWriter, request *http.Reques
 	id, _ := strconv.Atoi(mux.Vars(request)["id"])
 	row := model.db.QueryRow("SELECT Image FROM Menu WHERE Id = $1", id)
 	if row.Err() != nil {
-		writer.WriteHeader(404)
-		return
+		panic(row.Err())
 	}
 	image := make([]byte, 256*1024)
 	err := row.Scan(&image)
 	if err != nil {
-		panic(err)
+		writer.WriteHeader(404)
+		return
 	}
 	writer.Header().Set("Content-Type", "image/jpeg")
 	_, err = writer.Write(image)
