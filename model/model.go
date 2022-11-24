@@ -28,7 +28,7 @@ func (model Model) Close() {
 }
 
 func (model Model) EnumerateIds(writer http.ResponseWriter, request *http.Request) {
-	ids := make([]int, 16)
+	var ids []int
 	rows, err := model.db.Query("SELECT Id FROM Menu")
 	if err != nil {
 		panic(err)
@@ -39,6 +39,7 @@ func (model Model) EnumerateIds(writer http.ResponseWriter, request *http.Reques
 		if err != nil {
 			panic(err)
 		}
+		ids = append(ids, item)
 	}
 	writer.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(writer).Encode(ids)
