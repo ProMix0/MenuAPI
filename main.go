@@ -5,9 +5,10 @@ import (
 	"flag"
 	"fmt"
 	"github.com/gorilla/mux"
+	"log"
 	"net/http"
 	"os"
-	"runtime/debug"
+	"time"
 )
 
 func main() {
@@ -24,6 +25,7 @@ func main() {
 	defer model.Close()
 
 	router.Use(panicRecovery)
+	router.Use(logging)
 
 	router.HandleFunc("/list", model.EnumerateIds).Methods("GET")
 	router.HandleFunc("/item/{id:[0-9]+}", model.GetItem).Methods("GET")
@@ -34,13 +36,21 @@ func main() {
 	fmt.Println(http.ListenAndServe(addr, nil))
 }
 
+func logging(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		start := time.Now()
+		next.ServeHTTP(w, req)
+		log.Printf("%s %s %s\n", req.Method, req.RequestURI, time.Since(start))
+	})
+}
+
 func panicRecovery(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		defer func() {
 			if err := recover(); err != nil {
 				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-				fmt.Println(err)
-				fmt.Println(string(debug.Stack()))
+				log.Println(err)
+				//log.Println(string(debug.Stack()))
 			}
 		}()
 		next.ServeHTTP(w, req)
