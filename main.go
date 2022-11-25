@@ -2,12 +2,14 @@ package main
 
 import (
 	modelPkg "MenuAPI/model"
+	"context"
 	"flag"
-	"fmt"
 	"github.com/gorilla/mux"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 )
 
@@ -32,8 +34,17 @@ func main() {
 	router.HandleFunc("/item/{id:[0-9]+}/image", model.GetItemImage).Methods("GET")
 	router.HandleFunc("/purchase", model.Purchase).Methods("POST")
 
-	http.Handle("/", router)
-	fmt.Println(http.ListenAndServe(addr, nil))
+	server := http.Server{Addr: addr, Handler: router}
+	go log.Println(server.ListenAndServe())
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+
+	<-stop
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	log.Println(server.Shutdown(ctx))
 }
 
 func logging(next http.Handler) http.Handler {
