@@ -2,13 +2,23 @@ package main
 
 import (
 	modelPkg "MenuAPI/model"
+	"flag"
 	"fmt"
 	"github.com/gorilla/mux"
 	"net/http"
+	"os"
 	"runtime/debug"
 )
 
 func main() {
+	var addr string
+	flag.StringVar(&addr, "addr", "localhost:8082", "Address with port")
+	flag.Parse()
+	if addr == "" {
+		flag.Usage()
+		os.Exit(1)
+	}
+
 	router := mux.NewRouter()
 	model := modelPkg.NewModel("menu.db")
 	defer model.Close()
@@ -21,7 +31,7 @@ func main() {
 	router.HandleFunc("/purchase", model.Purchase).Methods("POST")
 
 	http.Handle("/", router)
-	fmt.Println(http.ListenAndServe("localhost:8082", nil))
+	fmt.Println(http.ListenAndServe(addr, nil))
 }
 
 func panicRecovery(next http.Handler) http.Handler {
