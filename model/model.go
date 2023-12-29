@@ -101,6 +101,7 @@ func (model Model) Purchase(writer http.ResponseWriter, request *http.Request) {
 		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
+	
 	state := validate(model, requestBody)
 	if !state.valid() {
 		writer.WriteHeader(http.StatusBadRequest)
@@ -123,14 +124,14 @@ func (model Model) Purchase(writer http.ResponseWriter, request *http.Request) {
 
 	//TODO get QR-code
 	writer.Header().Set("Content-Type", "image/jpeg")
-	file, _ := os.Open("QR-code.jpg")
+	file, _ := os.Open("QR-code.png")
 	_, err = io.Copy(writer, file)
 	file.Close()
 	if err != nil {
 		panic(err)
 	}
 
-	//TODO get paying confirmation
+	//TODO get payment confirmation
 	for _, item := range requestBody {
 		_, err = model.db.Exec("UPDATE Menu SET Locked = Locked - $1, Count = Count - $1 WHERE Id = $2", item.Count, item.Id)
 		if err != nil {
